@@ -11,7 +11,7 @@
     "postinstall": "git config core.hooksPath .husky",
     "start": "yarn clear && yarn install_sdk_dependencies && docusaurus start",
     "build_translation": "yarn ts-node ./src/scripts/move-untranslated-files.ts",
-    "build": "yarn install_sdk_dependencies && docusaurus build",
+    "build": "yarn install_sdk_dependencies && yarn build_translation && docusaurus build",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
