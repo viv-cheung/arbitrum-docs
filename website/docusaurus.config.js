@@ -29,7 +29,7 @@ const config = {
   i18n: {
     defaultLocale: 'en',
     // locales: ['en', 'ja', 'zh'],
-    locales: ['en'],
+    locales: ['en', 'ja', 'es', 'ko'],
   },
   presets: [
     [
@@ -143,10 +143,10 @@ const config = {
           // note:  we can uncomment this when we want to display the locale dropdown in the top navbar
           //        if we enable this now, the dropdown will appear above every document; if `ja` is selected for a document that isn't yet translated, it will 404
           //        there may be a way to show the dropdown only on pages that have been translated, but that's out of scope for the initial version
-          // {
-          //   type: 'localeDropdown',
-          //   position: 'right',
-          // }
+          {
+            type: 'localeDropdown',
+            position: 'right',
+          }
         ],
       },
       footer: {
