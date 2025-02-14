@@ -1,0 +1,64 @@
+---
+title: Una introducción suave
+description: Aprende los fundamentos de Nitro, la pila de Arbitrum.
+author: dzgoldman
+sme: dzgoldman
+user_story: As a current or prospective Arbitrum user, I need learn more about Nitros design.
+content_type: get-started
+---
+
+import ImageWithCaption from '@site/src/components/ImageCaptions/';
+
+Este documento es una explicación detallada del diseño de <a data-quicklook-from="arbitrum">Arbitrum</a> Nitro y la razón detrás de él. Esto no es documentación de API, ni es un recorrido guiado por el código; busca eso en otro lugar. "Inside <a data-quicklook-from="arbitrum-nitro">Arbitrum Nitro</a>" es para personas que quieren entender el diseño de Nitro.
+
+El cuerpo de este documento describirá Arbitrum Rollup, el caso de uso principal de la tecnología Nitro y el que se utiliza en la cadena <a data-quicklook-from="arbitrum-one">Arbitrum One</a>. Hay un caso de uso variante, llamado [AnyTrust](/how-arbitrum-works/08-anytrust-protocol.mdx), que es utilizado por la cadena <a data-quicklook-from="arbitrum-nova">Arbitrum Nova</a>.
+
+## ¿Por qué usar Arbitrum? ¿Por qué usar Nitro?
+Arbitrum es una solución de escalado L2 para Ethereum, que ofrece una combinación única de beneficios:
+- Seguridad <a data-quicklook-from="trustless">sin confianza</a>: seguridad arraigada en Ethereum, con cualquier parte capaz de asegurar los resultados correctos de la Capa 2
+- Compatibilidad con Ethereum: capaz de ejecutar contratos EVM no modificados y transacciones de Ethereum no modificadas
+- Escalabilidad: moviendo la computación y el almacenamiento de los contratos fuera de la cadena principal de Ethereum, permitiendo un rendimiento mucho mayor
+- Costo mínimo: diseñado e ingenierizado para minimizar la huella de gas de la cadena principal (L1) del sistema, minimizando el costo por <a data-quicklook-from="transaction">transacción</a>.
+
+Algunos otros sistemas de cadenas secundarias (L2) proporcionan algunas de estas características, pero hasta donde sabemos, ningún otro sistema ofrece la misma combinación de características al mismo costo.
+
+Nitro es una actualización importante para Arbitrum que incluye:
+- **Compresión avanzada de Calldata,** que reduce aún más los costos de transacción en Arbitrum al reducir la cantidad de datos publicados en la cadena principal (L1).
+- **Contextos separados para ejecución común y prueba de fallos,** aumentando el rendimiento de los nodos de la cadena principal, y así ofreciendo tarifas más bajas.
+- **Compatibilidad de gas con Ethereum L1,** alineando perfectamente los precios y la contabilidad para las operaciones EVM con Ethereum.
+- **Interoperabilidad adicional con L1,** incluyendo una sincronización más estrecha con los números de bloque de la cadena principal, y soporte completo para todas las precompilaciones de la cadena principal de Ethereum (L1).
+- **Retryables seguros,** eliminando el modo de falla donde un <a data-quicklook-from="retryable-ticket">Ticket Retryable</a> no se crea.
+- **Trazado de <a data-quicklook-from="geth">Geth</a>,** para un soporte de depuración aún más amplio.
+- Y muchos, muchos más cambios.
+
+## La visión general
+A nivel más básico, una <a data-quicklook-from="arbitrum-chain">cadena de Arbitrum</a> funciona así:
+
+<ImageWithCaption caption="Original napkin sketch drawn by Arbitrum co-founder Ed Felten" src="https://lh4.googleusercontent.com/qwf_aYyB1AfX9s-_PQysOmPNtWB164_qA6isj3NhkDnmcro6J75f6MC2_AjlN60lpSkSw6DtZwNfrt13F3E_G8jdvjeWHX8EophDA2oUM0mEpPVeTlMbsjUCMmztEM0WvDpyWZ6R" />
+
+Los usuarios y contratos ponen mensajes en la bandeja de entrada. La cadena lee los mensajes uno por uno y procesa cada uno. Esto actualiza el estado de la cadena y produce algunas salidas.
+
+Si quieres que una cadena de Arbitrum procese una transacción para ti, necesitas poner esa transacción en la bandeja de entrada de la cadena. Luego, la cadena verá tu transacción, la ejecutará y producirá algunas salidas: un recibo de transacción y cualquier retiro que tu transacción haya iniciado.
+
+La ejecución es determinista, lo que significa que el comportamiento de la cadena está determinado de manera única por el contenido de su bandeja de entrada. Debido a esto, el resultado de tu transacción es conocible tan pronto como tu transacción ha sido puesta en la bandeja de entrada. Cualquier nodo de Arbitrum podrá decirte el resultado. (Y puedes ejecutar un nodo de Arbitrum tú mismo si quieres).
+
+Todos los detalles técnicos en este documento están conectados a este diagrama. Para pasar de este diagrama a una descripción completa de Arbitrum, necesitaremos responder preguntas como estas:
+- ¿Quién lleva el registro de la bandeja de entrada, el <a data-quicklook-from="chain-state">estado de la cadena</a> y las salidas?
+- ¿Cómo asegura Arbitrum que el estado de la cadena y las salidas son correctos?
+- ¿Cómo pueden los usuarios y contratos de Ethereum interactuar con Arbitrum?
+- ¿Cómo soporta Arbitrum contratos y transacciones compatibles con Ethereum?
+- ¿Cómo se transfieren ETH y tokens dentro y fuera de las cadenas de Arbitrum, y cómo se gestionan mientras están en la cadena?
+- ¿Cómo puedo ejecutar mi propio nodo de Arbitrum o <a data-quicklook-from="validator">validador</a>?
+
+## El diseño de Nitro: Las cuatro grandes ideas
+La esencia de Nitro, y sus innovaciones clave, residen en cuatro grandes ideas. Las enumeraremos aquí con un resumen muy rápido de cada una, luego las desglosaremos en más detalle en secciones posteriores.
+
+**Gran idea: Secuenciación, seguida de ejecución determinista**: Nitro procesa transacciones con una estrategia de dos fases. Primero, las transacciones se organizan en una secuencia ordenada única, y Nitro se compromete a esa secuencia. Luego, las transacciones se procesan, en esa secuencia, por una <a data-quicklook-from="state-transition-function">función de transición de estado</a> determinista.
+
+**Gran idea: Geth en el núcleo**: Nitro soporta las estructuras de datos, formatos y máquina virtual de Ethereum compilando en el código central del popular software de nodo de Ethereum go-ethereum ("Geth"). Usar Geth como una biblioteca de esta manera asegura un muy alto grado de compatibilidad con Ethereum.
+
+**Gran idea: Separar ejecución de prueba**: Nitro toma el mismo código fuente y lo compila dos veces, una vez a código nativo para ejecución en un nodo Nitro, optimizado para velocidad, y nuevamente a <a data-quicklook-from="wasm">WASM</a> para uso en pruebas, optimizado para portabilidad y seguridad.
+
+**Gran idea: Optimistic Rollup con pruebas de fraude interactivas**: Nitro liquida transacciones en la cadena principal (L1) de Ethereum usando un protocolo Optimistic Rollup, incluyendo las pruebas de fraude interactivas pioneras de Arbitrum.
+
+Ahora que hemos cubierto los conceptos fundamentales, la gran imagen y las cuatro grandes ideas de Arbitrum Nitro, comenzaremos un viaje siguiendo una transacción a través del protocolo de Arbitrum. En la siguiente sección, comienza el ciclo de vida de la transacción.
